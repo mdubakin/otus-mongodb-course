@@ -61,4 +61,4 @@ MongoDB — это система с одним главным узлом, в к
 - [**IBM** | Теорема CAP](https://www.ibm.com/ru-ru/cloud/learn/cap-theorem#toc--cap-cp----oVh3rgM9)
 - [**Habr** | Всё, что вы не знали о CAP теореме](https://habr.com/ru/post/328792/)
 - [**Wikipedia** | PACELC theorem](https://en.wikipedia.org/wiki/PACELC_theorem)
-- [**Medium** | ](https://bikas-katwal.medium.com/mongodb-vs-cassandra-vs-rdbms-where-do-they-stand-in-the-cap-theorem-1bae779a7a15)
+- [**Medium** | What is the CAP Theorem? MongoDB vs Cassandra vs RDBMS, where do they stand in the CAP theorem?](https://bikas-katwal.medium.com/mongodb-vs-cassandra-vs-rdbms-where-do-they-stand-in-the-cap-theorem-1bae779a7a15)
