@@ -37,8 +37,8 @@
 
     # Where and how to store data.
     storage:
-    dbPath: /home/mongo/db1
-    journal:
+      dbPath: /home/mongo/db1
+      journal:
         enabled: true
     #  engine:
     #  mmapv1:
@@ -46,23 +46,23 @@
 
     # where to write logging data.
     systemLog:
-    destination: file
-    logAppend: true
-    path: /home/mongo/db1/db1.log
+      destination: file
+      logAppend: true
+      path: /home/mongo/db1/db1.log
 
     # network interfaces
     net:
-    port: 27017
-    bindIp: 0.0.0.0
+      port: 27017
+      bindIp: 0.0.0.0
 
 
     # how the process runs
     processManagement:
-    pidFilePath: /home/mongo/db1/db1.pid
-    timeZoneInfo: /usr/share/zoneinfo
+      pidFilePath: /home/mongo/db1/db1.pid
+      timeZoneInfo: /usr/share/zoneinfo
 
     security:
-    authorization: "enabled"
+      authorization: "enabled"
 
     #operationProfiling:
 
