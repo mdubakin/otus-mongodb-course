@@ -1,0 +1,178 @@
+-- развернем ВМ ubuntu focal 20-04 LTS
+gcloud beta compute --project=celtic-house-266612 instances create mongo --zone=us-central1-a --machine-type=e2-medium --subnet=default --network-tier=PREMIUM --maintenance-policy=MIGRATE --service-account=933982307116-compute@developer.gserviceaccount.com --scopes=https://www.googleapis.com/auth/cloud-platform --image=ubuntu-2004-focal-v20211118 --image-project=ubuntu-os-cloud --boot-disk-size=10GB --boot-disk-type=pd-ssd --boot-disk-device-name=mongo --no-shielded-secure-boot --shielded-vtpm --shielded-integrity-monitoring --reservation-affinity=any
+
+gcloud compute ssh mongo
+
+-- https://docs.mongodb.com/manual/tutorial/install-mongodb-on-ubuntu/
+
+
+-- установим mongo 4.4.9
+wget -qO - https://www.mongodb.org/static/pgp/server-4.4.asc | sudo apt-key add - && echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu focal/mongodb-org/4.4 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-4.4.list && sudo apt-get update && sudo apt-get install -y mongodb-org
+ 
+sudo mkdir /home/mongo && sudo mkdir /home/mongo/db1 && sudo chmod 777 /home/mongo/db1
+mongod --dbpath /home/mongo/db1 --port 27001 --fork --logpath /home/mongo/db1/db1.log --pidfilepath /home/mongo/db1/db1.pid
+
+mongo --port 27001
+
+show databases
+use test
+db.peoples.insert({'Name':'Mickey'})
+db.peoples.find()
+
+-- протестим ssh 
+gcloud beta compute --project=celtic-house-266612 instances create sshtest --zone=us-central1-a --machine-type=e2-medium --subnet=default --network-tier=PREMIUM --maintenance-policy=MIGRATE --service-account=933982307116-compute@developer.gserviceaccount.com --scopes=https://www.googleapis.com/auth/devstorage.read_only,https://www.googleapis.com/auth/logging.write,https://www.googleapis.com/auth/monitoring.write,https://www.googleapis.com/auth/servicecontrol,https://www.googleapis.com/auth/service.management.readonly,https://www.googleapis.com/auth/trace.append --image=ubuntu-2004-focal-v20211118 --image-project=ubuntu-os-cloud --boot-disk-size=10GB --boot-disk-type=pd-ssd --boot-disk-device-name=sshtest --no-shielded-secure-boot --shielded-vtpm --shielded-integrity-monitoring --reservation-affinity=any
+
+gcloud compute instances list
+
+gcloud compute ssh sshtest
+
+ssh aeugene@10.128.15.216
+
+cd .ssh
+ssh-keygen -t rsa
+-- запускаем агента, если не запущен
+eval `ssh-agent -s`
+ssh-add aeugene
+ssh aeugene@10.128.15.216
+
+-- добавим ключ в metadata
+cat aeugene.pub
+
+-- удалим тестовую ВМ
+gcloud compute instances delete sshtest
+
+
+-- настроим доступ извне
+-- срздадим пользователя root с паролем 
+mongo --port 27001
+use admin;
+db.createUser( { user: "root", pwd: "otus$123", roles: [ "userAdminAnyDatabase", "dbAdminAnyDatabase", "readWriteAnyDatabase" ] } )
+
+ps -xf
+sudo kill 2799
+-- bind_ip_all & --auth
+mongod --dbpath /home/mongo/db1 --port 27001 --fork --logpath /home/mongo/db1/db1.log --pidfilepath /home/mongo/db1/db1.pid --bind_ip_all --auth
+mongo --port 27001
+use test
+db.peoples.find()
+
+-- установить клиента
+sudo apt install mongodb-clients
+
+mongo 35.223.69.9:27001 -u root -p otus$123 --authenticationDatabase admin
+
+
+tail /home/mongo/db1/db1.log
+
+
+
+
+
+mongo 35.223.69.9:27001 -u root --authenticationDatabase admin
+
+-- $ в строке не поддерживается)
+-- экранируем
+mongo 35.223.69.9:27001 -u root -p otus\$123 --authenticationDatabase admin
+
+-- compass
+mongodb://root:otus$123@35.223.69.9:27001/admin
+
+gcloud compute instances delete mongo
+
+
+-- установим монго 5
+
+gcloud beta compute --project=celtic-house-266612 instances create mongo5 --zone=us-central1-a --machine-type=e2-medium --subnet=default --network-tier=PREMIUM --maintenance-policy=MIGRATE --service-account=933982307116-compute@developer.gserviceaccount.com --scopes=https://www.googleapis.com/auth/cloud-platform --image=ubuntu-2004-focal-v20211118 --image-project=ubuntu-os-cloud --boot-disk-size=10GB --boot-disk-type=pd-ssd --boot-disk-device-name=mongo --no-shielded-secure-boot --shielded-vtpm --shielded-integrity-monitoring --reservation-affinity=any
+
+gcloud compute ssh mongo5
+
+-- https://docs.mongodb.com/manual/tutorial/install-mongodb-on-ubuntu/
+wget -qO - https://www.mongodb.org/static/pgp/server-5.0.asc | sudo apt-key add - && echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu focal/mongodb-org/5.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-5.0.list && sudo apt-get update && sudo apt-get install -y mongodb-org
+
+-- если какой то пакет не нужен, то перед установкой помечаем его hold - до установки монго!
+echo "mongodb-org hold" | sudo dpkg --set-selections
+echo "mongodb-org-database hold" | sudo dpkg --set-selections
+echo "mongodb-org-server hold" | sudo dpkg --set-selections
+echo "mongodb-org-shell hold" | sudo dpkg --set-selections
+echo "mongodb-org-mongos hold" | sudo dpkg --set-selections
+echo "mongodb-org-tools hold" | sudo dpkg --set-selections
+
+sudo mkdir /home/mongo &&  sudo mkdir /home/mongo/db1 && sudo chmod 777 /home/mongo/db1
+mongod --dbpath /home/mongo/db1 --port 27001 --fork --logpath /home/mongo/db1/db1.log --pidfilepath /home/mongo/db1/db1.pid
+
+mongo --port 27001
+-- Warning: the "mongo" shell has been superseded by "mongosh",
+-- which delivers improved usability and compatibility.The "mongo" shell has been deprecated and will be removed in an upcoming release.
+
+mongosh --port 27001
+
+-- Soft rlimits for open file descriptors too low
+-- https://stackoverflow.com/questions/35110651/warning-soft-rlimits-too-low-number-of-files-is-256-should-be-at-least-100
+ulimit -n
+
+gcloud compute instances delete mongo5
+
+
+
+-- docker
+
+gcloud beta compute --project=celtic-house-266612 instances create mongodocker --zone=us-central1-a --machine-type=e2-medium --subnet=default --network-tier=PREMIUM --maintenance-policy=MIGRATE --service-account=933982307116-compute@developer.gserviceaccount.com --scopes=https://www.googleapis.com/auth/cloud-platform --image=ubuntu-2004-focal-v20211118 --image-project=ubuntu-os-cloud --boot-disk-size=10GB --boot-disk-type=pd-ssd --boot-disk-device-name=mysqldocker --no-shielded-secure-boot --shielded-vtpm --shielded-integrity-monitoring --reservation-affinity=any
+ 
+gcloud compute ssh mongodocker
+
+-- поставим докер
+sudo apt-get update && sudo apt-get install -y apt-transport-https ca-certificates curl gnupg-agent software-properties-common && curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add - && sudo apt-key fingerprint 0EBFCD88 && sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" && sudo apt-get update && sudo apt-get install -y docker-ce docker-ce-cli containerd.io
+
+-- https://www.mongodb.com/compatibility/docker
+-- 1. Создаем docker-сеть: 
+sudo docker network create mongo-net
+
+-- 2. подключаем созданную сеть к контейнеру сервера MongoDB:
+sudo  docker run --name mongo-server --network mongo-net -d -p 27017:27017 -v /home/aeugene/mongo:/data/db mongo:5.0.4
+-- MONGO_INITDB_ROOT_USERNAME=root -e MONGO_INITDB_ROOT_PASSWORD=otus123
+
+sudo docker inspect mongo-server | grep IPAddress 
+
+-- 3. Запускаем отдельный контейнер с клиентом в общей сети с БД: 
+sudo docker run -it --rm --name mongo-client --network mongo-net mongo:5.0.4 mongo mongo-server
+sudo docker run -it --rm --name mongo-client --network mongo-net mongo:5.0.4 mongo 172.18.0.2
+
+-- 4. Проверяем, что подключились через отдельный контейнер:
+sudo docker ps -a
+
+-- учтите, порт торчит наружу!!!
+ss -tlpn
+
+sudo apt install net-tools -y
+netstat -a | grep mongo
+
+mongo 35.223.69.9:27017 -u root -p otus\$123 --authenticationDatabase admin
+
+
+sudo docker stop mongo-server
+sudo docker rm mongo-server
+
+
+-- docker compose
+sudo apt install docker-compose -y
+
+scp /mnt/c/download/docker-compose.yml aeugene@35.223.69.9:/home/aeugene/
+
+sudo docker-compose up
+sudo docker-compose up -d
+
+sudo docker ps
+sudo docker exec -it aeugene_mongodb_1 bash
+
+db.createUser( { user: "root", pwd: "otus123", roles: [ "userAdminAnyDatabase", "dbAdminAnyDatabase", "readWriteAnyDatabase" ] } )
+-- https://stackoverflow.com/questions/34559557/how-to-enable-authentication-on-mongodb-through-docker
+
+mongo 35.223.69.9:27017 -u root -p otus123 --authenticationDatabase admin
+
+-- fork процесса
+sudo docker-compose up -d
+
+gcloud compute instances delete mongodocker
+
+
+
