@@ -1,0 +1,135 @@
+mongo --port 27017
+
+db.hello()
+
+show dbs
+
+use <db name>
+
+show collections
+
+----------
+print("Hello, world")
+
+for(var i = 0; i<5; i++) {print(i);}
+
+-----
+db.createCollection("cars")
+db.car.insertOne( { _id: 1, car: "bmw", qty: 2 } )
+db.car.insertMany([ { _id: 2, car: "ford", qty: 3 },
+{ _id: 3, cat: "Tom", color: "black"} ])
+
+
+------
+db.movie.insert( { _id: 10, item: "box", qty: 20 } )
+
+db.movie.insert([
+{"_id":11,"title":"Son of the Pink Panther","year":1993,"cast":["Roberto Benigni","Herbert Lom","Claudia Cardinale"],"genres":["Comedy"]},
+{"_id":12,"title":"The Dentist 2","year":1998,"cast":["Corbin Bernsen","Jillian McWhirter"],"genres":["Horror"]}])
+
+
+db.movie.insert([
+{"_id":11,"title":"Son of the Pink Panther","year":1993,"cast":["Roberto Benigni","Herbert Lom","Claudia Cardinale"],"genres":["Comedy"]},
+{"_id":12,"title":"The Dentist 2","year":1998,"cast":["Corbin Bernsen","Jillian McWhirter"],"genres":["Horror"]},
+{"_id":13,"title":"Desert Blue","year":1998,"cast":["Brendan Sexton III","Kate Hudson","Casey Affleck","Christina Ricci"],"genres":["Comedy","Drama"]},
+{"_id":14,"title":"Ted","year":2012,"cast":["Mark Wahlberg","Mila Kunis","Seth MacFarlane"],"genres":["Comedy"]},
+{"_id":15,"title":"The Contractor","year":2013,"cast":["Danny Trejo","Brad Rowe","Christina Cox"],"genres":["Action"]},
+{"_id":16,"title":"Need for Speed","year":2014,"cast":["Aaron Paul","Dominic Cooper","Imogen Poots","Kid Cudi"],"genres":["Action"]}])
+
+
+db.movie.insert([
+{"_id":11,"title":"Son of the Pink Panther","year":1993,"cast":["Roberto Benigni","Herbert Lom","Claudia Cardinale"],"genres":["Comedy"]},
+{"_id":12,"title":"The Dentist 2","year":1998,"cast":["Corbin Bernsen","Jillian McWhirter"],"genres":["Horror"]},
+{"_id":13,"title":"Desert Blue","year":1998,"cast":["Brendan Sexton III","Kate Hudson","Casey Affleck","Christina Ricci"],"genres":["Comedy","Drama"]},
+{"_id":14,"title":"Ted","year":2012,"cast":["Mark Wahlberg","Mila Kunis","Seth MacFarlane"],"genres":["Comedy"]},
+{"_id":15,"title":"The Contractor","year":2013,"cast":["Danny Trejo","Brad Rowe","Christina Cox"],"genres":["Action"]},
+{"_id":16,"title":"Need for Speed","year":2014,"cast":["Aaron Paul","Dominic Cooper","Imogen Poots","Kid Cudi"],"genres":["Action"]}], 
+{ordered:false})
+
+
+db.movie.insert([
+{"title":"Second Act","year":2018,"cast":["Jennifer Lopez","Vanessa Hudgens","Leah Remini"],"genres":["Romance","Comedy"]},
+{"title":"Mary Poppins Returns","year":2018,"cast":["Emily Blunt","Lin-Manuel Miranda","Ben Whishaw"],"genres":["Musical","Fantasy"]},
+{"title":"Aquaman","year":2018,"cast":["Jason Momoa","Amber Heard","Willem Dafoe","Dolph Lundgren"],"genres":["Superhero","Action","Adventure"]}])
+
+---- поиск
+db.movie.find()
+db.movie.find().pretty()
+
+
+--
+db.movie.find({"_id" : 10})
+db.movie.find({"genres": "Action"})
+db.movie.find({"year" : 1989, "genres": "Action"})
+db.movie.find({$and :[{"year" : 1989}, {"genres": "Action"}]})
+
+db.movie.find({$or :[{"year" : 1989}, {"genres": "Action"}]})
+
+db.movie.find({"year" : {$gt: 2000}})
+
+db.movie.find({"cast" : {$regex: "D"}})
+db.movie.find({"cast" : {$regex: "^D"}})
+
+db.movie.find({"year" : {$gt: 2000}, $or: [{"genres": "Musical"}, {"cast" : {$regex: "^D"}}]})
+
+db.movie.find({"year": {$in: [1987, 2013]} })
+
+db.movie.find({}, {"title" : 1} )
+
+db.movie.find({}, {"title" : 1, _id : 0} )
+
+--- sort
+db.movie.find({}, {"title" : 1, _id : 0} ).sort({"title": 1})
+
+--- limit
+db.movie.find().limit(0)
+db.movie.find().sort({"title": 1}).limit(5)
+
+---skip
+db.movie.find().sort({"title": -1}).skip(1).limit(5)
+
+---index
+db.movie.createIndex( {"year" : 1 })
+
+db.movie.createIndex( {"title" : "text" })
+db.movie.find({$text: {$search: "September" }  } )
+
+--- aggregate
+db.movie.aggregate([ {$group : {_id : "$year", count_movie : {$sum : 1} } } ] )
+
+db.movie.count()
+
+db.movie.count({ "year" : {$lt : 2000 } } )
+
+db.movie.distinct("year")
+
+
+---update
+db.movie.update({"_id" : 1}, {"qty": 10})
+
+db.movie.update({"_id" : 1}, {"qty": 20, "tovar": "car"})
+
+db.movie.update({"_id" : 1}, {$set: {"qty": 50}})
+
+db.movie.update({"_id" : 2}, {$set: {"rating": 7.5}})
+
+db.movie.update({"year" : {$gt: 2000}}, {$set: {"rating": 5}})
+
+db.movie.update({"year" : {$gt: 2000}}, {$set: {"rating": 5}}, {multi : true} )
+
+
+
+---delete 
+db.movie.deleteOne({"_id": 1})
+
+db.movie.deleteOne({"_id": {$lt: 5}})
+
+db.movie.deleteMany({"_id": {$lt: 5}})
+
+db.movie.deleteMany({})
+
+--
+db.movie.drop()
+
+db.dropDatabase()
+
