@@ -1,0 +1,390 @@
+-- развернем ВМ mongo 4.4.9
+gcloud beta compute --project=celtic-house-266612 instances create mongo --zone=us-central1-a --machine-type=e2-medium --subnet=default --network-tier=PREMIUM --maintenance-policy=MIGRATE --service-account=933982307116-compute@developer.gserviceaccount.com --scopes=https://www.googleapis.com/auth/cloud-platform --image=ubuntu-2004-focal-v20210223 --image-project=ubuntu-os-cloud --boot-disk-size=10GB --boot-disk-type=pd-ssd --boot-disk-device-name=mongo --no-shielded-secure-boot --shielded-vtpm --shielded-integrity-monitoring --reservation-affinity=any
+
+gcloud compute ssh mongo
+
+-- установим монго
+wget -qO - https://www.mongodb.org/static/pgp/server-4.4.asc | sudo apt-key add - && echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu focal/mongodb-org/4.4 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-4.4.list && sudo apt-get update && sudo apt-get install -y mongodb-org
+
+sudo mkdir /home/mongo &&  sudo mkdir /home/mongo/db1 && sudo chmod 777 /home/mongo/db1
+mongod --dbpath /home/mongo/db1 --port 27001 --fork --logpath /home/mongo/db1/db1.log --pidfilepath /home/mongo/db1/db1.pid
+
+mongo --port 27001
+
+> db.orders.insertMany([
+    {custID:"10001",amount:500,status:"A"},
+    {custID:"10001",amount:250,status:"A"},
+    {custID:"10002",amount:200,status:"A"},
+    {custID:"10001",amount: 300, status:"D"}])
+
+> db.orders.find()
+
+> db.orders.aggregate([
+   { $match: { status: "A" } },
+   { $group: { _id: "$custID", total: { $sum: "$amount" } } }
+])
+
+-- if only id -> only _id
+> db.orders.aggregate([
+   { $match: { status: "A" } },
+   { $group: { id: "$custID", total: { $sum: "$amount" } } }
+])
+-- error
+
+
+
+> db.inventory.insert([
+{ _id: 2, item: { name: "cd", code: "123" }, qty: 20, tags: [ "B" ] },
+{ _id: 3, item: { name: "ij", code: "456" }, qty: 25, tags: [ "A", "B" ] },
+{ _id: 4, item: { name: "xy", code: "456" }, qty: 30, tags: [ "B", "A" ] },
+{ _id: 5, item: { name: "mn", code: "000" }, qty: 20, tags: [ [ "A", "B" ], "C" ] },
+{ _id: 6, item: { name: "mn", code: "222" }, qty: 2, tags: [ [ "A", "B" ], "C" ] },
+{ _id: 1, item: { name: "ab", code: "123" }, qty: 15, tags: [ "A", "B", "C" ] }])
+
+
+-- поиск по массиву
+> db.inventory.aggregate([
+   { $match: { tags: ["B"] } },
+   { $group: { _id: "$item.name", total: { $sum: "$qty" } } }
+])
+
+-- поиск по элементам массива
+> db.inventory.aggregate([
+   { $match: { tags: "B" } },
+   { $group: { _id: "$item.name", total: { $sum: "$qty" } } }
+])
+
+db.inventory.aggregate([
+   { $match: { "tags": { $elemMatch:{ $in :["B"] } } } },
+   { $group: { _id: "$item.name", total: { $sum: "$qty" } } }
+])
+
+
+-- поиск в подмассиве 
+db.inventory.aggregate([
+   { $match: { "tags": { $elemMatch: { $elemMatch:{ $in :["B"] } } } } },
+   { $group: { _id: "$item.name", total: { $sum: "$qty" } } }
+])
+
+-- если не нужна аггрегация
+db.inventory.aggregate([
+   { $match: { "tags": { $elemMatch: { $elemMatch:{ $in :["B"] } } } } }
+])
+
+-- https://docs.mongodb.com/manual/tutorial/query-arrays/
+
+-- посчитать мин, макс, среднее по всей коллекции
+> db.inventory.aggregate([
+    { $match: { tags: "B" } },
+    { $group: {  
+                _id: "$item.name", 
+                total: { $sum: "$qty"},
+                avg: { $avg: "$qty"},
+                min: { $min: "$qty"},
+                max: { $max: "$qty"}                
+              } 
+    }
+])
+
+db.inventory.aggregate([
+    { $group: {  
+                _id: "$item.name", 
+                total: { $sum: "$qty"},
+                avg: { $avg: "$qty"},
+                min: { $min: "$qty"},
+                max: { $max: "$qty"}                
+              } 
+    }
+])
+
+-- лайфхак
+-- сгруппируем по константе %) -- или _id : null
+db.inventory.aggregate([
+    { $match: { tags: "B" } },
+    { $group: {  
+                _id: 1, 
+                total: { $sum: "$qty"},
+                avg: { $avg: "$qty"},
+                min: { $min: "$qty"},
+                max: { $max: "$qty"}                
+              } 
+    }
+])
+
+
+--выбрать все поддокументы
+db.inventory.find({},{"item" : 1 })
+
+-- выбрать все поддукументы 
+db.inventory.aggregate([{$addFields : {itemName : "$item.name", itemCode : "$item.code"}}])
+
+db.inventory.aggregate([{$addFields : {itemName : "$item.name", itemCode : "$item.code"}}, 
+                        {$project : {itemName : 1, itemCode : 1} }])
+
+-- без вывода id, чисто name и code
+db.inventory.aggregate([{$addFields : {itemName : "$item.name", itemCode : "$item.code"}}, 
+                        {$project : {itemName : 1, itemCode : 1, _id : 0} }])
+
+db.inventory.aggregate([{$addFields : {itemName : "$item.name", itemCode : "$item.code"}}, 
+                        {$project : {itemName : 1, itemCode : 1, _id : 0} },
+                        {$out : "inv2"}])
+db.inv2.find()
+
+-- $join
+-- https://docs.mongodb.com/manual/reference/operator/aggregation/lookup/#pipe._S_lookup
+
+> db.orders2.insert([
+   { "_id" : 1, "item" : "almonds", "price" : 12, "quantity" : 2 },
+   { "_id" : 2, "item" : "pecans", "price" : 20, "quantity" : 1 },
+   { "_id" : 3  }
+])
+
+> db.inventory2.insert([
+   { "_id" : 1, "sku" : "almonds", description: "product 1", "instock" : 120 },
+   { "_id" : 2, "sku" : "bread", description: "product 2", "instock" : 80 },
+   { "_id" : 3, "sku" : "cashews", description: "product 3", "instock" : 60 },
+   { "_id" : 4, "sku" : "pecans", description: "product 4", "instock" : 70 },
+   { "_id" : 5, "sku": null, description: "Incomplete" },
+   { "_id" : 6 }
+])
+
+
+-- Left join
+
+> db.orders2.aggregate([
+   {
+     $lookup:
+       {
+         from: "inventory2",
+         localField: "item",
+         foreignField: "sku",
+         as: "inventory_docs"
+       }
+  }
+])
+
+-- поля можно писать в любом порядке
+db.orders2.aggregate([
+   {
+     $lookup:
+       {
+         localField: "item",
+         from: "inventory2",
+         foreignField: "sku",
+         as: "inventory_docs"
+       }
+  }
+])
+
+
+
+-- сохранить в другую коллекцию
+db.orders2.aggregate([
+   {
+     $lookup:
+       {
+         from: "inventory2",
+         localField: "item",
+         foreignField: "sku",
+         as: "inventory_docs"
+       }
+  },
+    { $out : "results" }
+])
+
+db.results.find()
+
+
+-- !!! джойн с другой БД
+-- как то так https://overcoder.net/q/8177/%D0%BA%D0%B0%D0%BA-%D0%B2%D1%8B%D0%BF%D0%BE%D0%BB%D0%BD%D0%B8%D1%82%D1%8C-%D1%8D%D0%BA%D0%B2%D0%B8%D0%B2%D0%B0%D0%BB%D0%B5%D0%BD%D1%82-sql-join-%D0%B2-mongodb
+
+
+-- merge - write result to specified collection
+-- https://docs.mongodb.com/manual/reference/operator/aggregation/merge/#pipe._S_merge
+
+
+-- single purpose aggragation
+-- distinct
+db.inventory3.insertMany([
+{ "_id": 1, "dept": "A", "item": { "sku": "111", "color": "red" }, "sizes": [ "S", "M" ] },
+{ "_id": 2, "dept": "A", "item": { "sku": "111", "color": "blue" }, "sizes": [ "M", "L" ] },
+{ "_id": 3, "dept": "B", "item": { "sku": "222", "color": "blue" }, "sizes": "S" },
+{ "_id": 4, "dept": "A", "item": { "sku": "333", "color": "black" }, "sizes": [ "S" ] }])
+
+db.inventory3.distinct( "dept" )
+db.inventory3.distinct( "item.sku", { dept: "A" } )
+
+
+Map Reduce
+-- хотим узнать количество интересов у группы людей
+
+> db.users.insertMany([
+    {name : "John2",age : 23,interests : ["football", "IT", "cooking", "Postgres"]},
+    {name : "Daw2",age : 23,interests : ["football", "IT", "MongoDB"]},
+    {name : "Jane2",age : 33,interests : ["cooking",  "tvshow"]}]);
+
+> function map(){
+    for(var i in this.interests) {
+        emit(this.interests[i], 1);
+    } //this.interests.forEach(function(interest){ emit(interest, 1); });
+}
+-- MongoDB:1,1,1,1,1
+
+> function reduce(key, values) {
+    var sum = 0;
+    for(var i in values) {
+        sum += values[i];
+    }
+    return sum; //return Array.sum(values)
+}
+
+> db.users.mapReduce(map, reduce,{out:"interests"})
+> db.interests.find()
+
+
+
+
+-- мы хотим узнать среднее количество интересов у людей разных возрастов
+-- записываем сразу документ, вместо 1 значения
+> function map(){
+    emit(this.age, {interests_count: this.interests.length, count: 1});
+}
+
+> function reduce(key, values) {
+    var sum = 0;
+    var count = 0;
+    for(var i in values){
+        count += values[i].count;
+        sum += values[i].interests_count;
+    }
+    return {interests_count: sum, count: count};
+}
+
+> function finalize(key, reducedValue) {
+        return reducedValue.interests_count / reducedValue.count;
+    }
+
+> db.users.mapReduce(map, reduce, {finalize: finalize, out:"interests_by_age"})
+> db.interests_by_age.find()
+
+
+
+-- transactions
+-- snapshot means that the transaction will read a snapshot of data that has been committed by a majority of nodes in the cluster
+    session.startTransaction({
+        "readConcern": { "level": "snapshot" },
+        "writeConcern": { "w": "majority" }
+    })
+db.cities.insertMany([
+    {"name": "Tokyo", "country": "Japan", "continent": "Asia", "population": 37.400 },
+    {"name": "Delhi", "country": "India", "continent": "Asia", "population": 28.514 },
+    {"name": "Seoul", "country": "South Korea", "continent": "Asia", "population": 25.674 }
+])
+
+var session = db.getMongo().startSession()
+session.startTransaction()
+var cities = session.getDatabase('test').getCollection('cities')
+cities.find()
+cities.insertOne({"name": "Buenos Aires", "country": "Argentina", "continent": "South America", "population": 14.967 })
+session.commitTransaction()
+-- session.abortTransaction()
+cities.find()
+
+-- By default, MongoDB will automatically abort any transaction that runs for more than 60 seconds
+
+mongod --dbpath /home/mongo/db1 --port 27001 --replSet RS --fork --logpath /home/mongo/db1/db1.log --pidfilepath /home/mongo/db1/db1.pid
+mongo --port 27001
+rs.initiate()
+
+--view
+db.createView("firstview","cities",[ { $project: { "Name": "$Name", Subject: 1 } } ])
+db.firstview.find();
+
+-- в чем ошибка?
+
+
+
+
+
+db.firstview.drop();
+db.createView("firstview","cities",[ { $project: { "Name": "$name", Subject: 1 } } ])
+db.firstview.find();
+cities.insertOne({"name": "Murmansk", "country": "Russia"})
+db.firstview.find();
+
+-- materialized view
+
+
+db.bakesales.insertMany( [
+   { date: new ISODate("2018-12-01"), item: "Cake - Chocolate", quantity: 2, amount: new NumberDecimal("60") },
+   { date: new ISODate("2018-12-02"), item: "Cake - Peanut Butter", quantity: 5, amount: new NumberDecimal("90") },
+   { date: new ISODate("2018-12-02"), item: "Cake - Red Velvet", quantity: 10, amount: new NumberDecimal("200") },
+   { date: new ISODate("2018-12-04"), item: "Cookies - Chocolate Chip", quantity: 20, amount: new NumberDecimal("80") },
+   { date: new ISODate("2018-12-04"), item: "Cake - Peanut Butter", quantity: 1, amount: new NumberDecimal("16") },
+   { date: new ISODate("2018-12-05"), item: "Pie - Key Lime", quantity: 3, amount: new NumberDecimal("60") },
+   { date: new ISODate("2019-01-25"), item: "Cake - Chocolate", quantity: 2, amount: new NumberDecimal("60") },
+   { date: new ISODate("2019-01-25"), item: "Cake - Peanut Butter", quantity: 1, amount: new NumberDecimal("16") },
+   { date: new ISODate("2019-01-26"), item: "Cake - Red Velvet", quantity: 5, amount: new NumberDecimal("100") },
+   { date: new ISODate("2019-01-26"), item: "Cookies - Chocolate Chip", quantity: 12, amount: new NumberDecimal("48") },
+   { date: new ISODate("2019-01-26"), item: "Cake - Carrot", quantity: 2, amount: new NumberDecimal("36") },
+   { date: new ISODate("2019-01-26"), item: "Cake - Red Velvet", quantity: 5, amount: new NumberDecimal("100") },
+   { date: new ISODate("2019-01-27"), item: "Pie - Chocolate Cream", quantity: 1, amount: new NumberDecimal("20") },
+   { date: new ISODate("2019-01-27"), item: "Cake - Peanut Butter", quantity: 5, amount: new NumberDecimal("80") },
+   { date: new ISODate("2019-01-27"), item: "Tarts - Apple", quantity: 3, amount: new NumberDecimal("12") },
+   { date: new ISODate("2019-01-27"), item: "Cookies - Chocolate Chip", quantity: 12, amount: new NumberDecimal("48") },
+   { date: new ISODate("2019-01-27"), item: "Cake - Carrot", quantity: 5, amount: new NumberDecimal("36") },
+   { date: new ISODate("2019-01-27"), item: "Cake - Red Velvet", quantity: 5, amount: new NumberDecimal("100") },
+   { date: new ISODate("2019-01-28"), item: "Cookies - Chocolate Chip", quantity: 20, amount: new NumberDecimal("80") },
+   { date: new ISODate("2019-01-28"), item: "Pie - Key Lime", quantity: 3, amount: new NumberDecimal("60") },
+   { date: new ISODate("2019-01-28"), item: "Cake - Red Velvet", quantity: 5, amount: new NumberDecimal("100") },
+] );
+
+updateMonthlySales = function(startDate) {
+   db.bakesales.aggregate( [
+      { $match: { date: { $gte: startDate } } },
+      { $group: { _id: { $dateToString: { format: "%Y-%m", date: "$date" } }, sales_quantity: { $sum: "$quantity"}, sales_amount: { $sum: "$amount" } } },
+      { $merge: { into: "monthlybakesales", whenMatched: "replace" } }
+   ] );
+};
+
+updateMonthlySales(new ISODate("1970-01-01"));
+db.monthlybakesales.find().sort({_id: 1});
+
+db.bakesales.insertMany( [
+   { date: new ISODate("2019-01-28"), item: "Cake - Chocolate", quantity: 3, amount: new NumberDecimal("90") },
+   { date: new ISODate("2019-01-28"), item: "Cake - Peanut Butter", quantity: 2, amount: new NumberDecimal("32") },
+   { date: new ISODate("2019-01-30"), item: "Cake - Red Velvet", quantity: 1, amount: new NumberDecimal("20") },
+   { date: new ISODate("2019-01-30"), item: "Cookies - Chocolate Chip", quantity: 6, amount: new NumberDecimal("24") },
+   { date: new ISODate("2019-01-31"), item: "Pie - Key Lime", quantity: 2, amount: new NumberDecimal("40") },
+   { date: new ISODate("2019-01-31"), item: "Pie - Banana Cream", quantity: 2, amount: new NumberDecimal("40") },
+   { date: new ISODate("2019-02-01"), item: "Cake - Red Velvet", quantity: 5, amount: new NumberDecimal("100") },
+   { date: new ISODate("2019-02-01"), item: "Tarts - Apple", quantity: 2, amount: new NumberDecimal("8") },
+   { date: new ISODate("2019-02-02"), item: "Cake - Chocolate", quantity: 2, amount: new NumberDecimal("60") },
+   { date: new ISODate("2019-02-02"), item: "Cake - Peanut Butter", quantity: 1, amount: new NumberDecimal("16") },
+   { date: new ISODate("2019-02-03"), item: "Cake - Red Velvet", quantity: 5, amount: new NumberDecimal("100") }
+] )
+
+db.monthlybakesales.find().sort({_id: 1});
+-- refresh
+updateMonthlySales(new ISODate("2019-01-01"));
+db.monthlybakesales.find().sort({_id: 1});
+
+-- watch
+watchCursor = db.getSiblingDB("test").cities.watch(
+   [
+      { $match : {"operationType" : "insert" } }
+   ]
+)
+while (!watchCursor.isExhausted()){
+   if (watchCursor.hasNext()){
+      print(tojson(watchCursor.next()));
+   }
+}
+-- in 2 window
+db.cities.insertOne({"name": "Sochi", "country": "Russia"})
+
+
+gcloud compute instances delete mongo
+
+
+

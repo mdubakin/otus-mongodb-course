@@ -225,6 +225,29 @@ db.Mall_Customers.update(
   )
 ```
 
+Меняем возраст и пол для покупателя с ID 8:
+```js
+db.Mall_Customers.updateOne(
+  { "CustomerID": 8 },
+  { "$set": {
+    "Age": 24,
+    "Genre": "Male"
+  } }
+  )
+```
+
+Добавляем список покупок покупателю с ID 8:
+```js
+db.Mall_Customers.updateOne(
+  { "CustomerID": 8 },
+  { "$push": {
+    "purchases": {
+      "item": "iPhone 12 Pro Max 256Gb",
+      "cost": "1000$"}
+  } }
+  )
+```
+
 Удалим всех покупателей младшей 18 лет:
 ```js
 db.Mall_Customers.deleteMany(
