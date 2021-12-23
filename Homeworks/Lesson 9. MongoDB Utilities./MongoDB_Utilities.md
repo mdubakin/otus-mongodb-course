@@ -12,7 +12,7 @@
   - [x] 1.2. Формат URI для подключения к кластеру.
   - [x] 1.3. Как не получать ошибки при восстановлении данных из бэкапа? Для mongorestore? Для mongoimport? 
 2. Поработать с утилитами:
-  - [] mongotop
+  - [x] mongotop
   - [] mongostat
   - [] mongofiles
   - [] mongodump
@@ -48,4 +48,13 @@ mongoimport --uri="mongodb+srv://<your username>:<your password>@<your cluster>.
 
 ## 2. Утилиты.
 
-### 2.1.
+### 2.1. mongotop
+Утилита для просмотра информации о чтении и записи в коллекции.
+
+Пример:
+1. `mongotop` # Если база слушает локалхост. Информация обновляется каждые 2 секунды.
+2. `mongotop 10` # Информация обновляется каждые 10 секунд.
+3. `mongotop 60 --host mongodb-host.example.com -u root -p StronGPa$$word --authenticationDatabase admin` # Удаленное подключение к базе для просмотра информации о чтении и записи. Информация обновляется каждую минуту.
+
+References:
+- https://docs.mongodb.com/database-tools/mongotop/
