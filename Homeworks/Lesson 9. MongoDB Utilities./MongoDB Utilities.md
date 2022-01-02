@@ -14,7 +14,6 @@
 2. Поработать с утилитами:
   - [x] mongotop
   - [] mongostat
-  - [] mongofiles
   - [] mongodump
   - [] mongorestore
   - [] mongoexport
